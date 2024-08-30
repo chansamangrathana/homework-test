@@ -1,0 +1,51 @@
+services:
+  db-course:
+    image: "mongo:7.0.12-rc1-jammy"
+    container_name: "db-homework"
+    ports:
+      - "27020:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=rathana
+      - MONGO_INITDB_ROOT_PASSWORD=rathana%10
+    restart: always
+    healthcheck:
+      test: echo 'db.runCommand({find:"db-homework.rathana"}).ok' | mongosh --authenticationDatabase admin --host localhost -u rathana -p rathana%10 admin --quiet | grep -q 1
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    volumes:
+      - homework_mongodb_data_volume:/data/db/
+      - homework_mongodb_log_volume:/var/log/mongodb/
+    networks:
+      - homework_mongodb_net
+  api-course:
+    build: .
+    image: "api-course"
+    container_name: "api-course"
+    ports:
+      - "8082:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    depends_on:
+      db-course:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    healthcheck:
+      test: "curl --fail --silent localhost:8080/actuator/health/readiness | grep UP || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - homework_mongodb_net
+
+volumes:
+  homework_mongodb_data_volume:
+  homework_mongodb_log_volume:
+
+networks:
+  homework_mongodb_net:
